@@ -1,4 +1,4 @@
-import { format, addDays } from 'date-fns';
+import { format, addDays, startOfWeek, endOfWeek, addMonths } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import Holidays from 'date-holidays';
 
@@ -33,10 +33,14 @@ export function getMonthStartDate(
   return startDate;
 }
 
-export function getMonthEndDate(startDate: Date): Date {
-  const endDate = new Date(startDate);
-  endDate.setMonth(endDate.getMonth() + 1);
+export function getNextMonthStartDate(startDate: Date): Date {
+  // 다음 달의 같은 날짜를 계산
+  const nextMonthDate = addMonths(startDate, 1);
+
+  // 다음 달 startDate의 전날을 반환
+  const endDate = new Date(nextMonthDate);
   endDate.setDate(endDate.getDate() - 1);
+
   return endDate;
 }
 
@@ -45,19 +49,23 @@ export function getWeeklyBudgets(
   endDate: Date
 ): Array<{ startDate: Date; endDate: Date }> {
   const weeks = [];
-  const currentDate = new Date(startDate);
 
-  while (currentDate <= endDate) {
-    const weekStart = new Date(currentDate);
-    const weekEnd = new Date(currentDate);
-    weekEnd.setDate(weekEnd.getDate() + 6);
+  // 시작일이 속한 주의 월요일부터 시작
+  let currentWeekStart = startOfWeek(startDate, { weekStartsOn: 1 }); // 1 = 월요일
+  let currentWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 }); // 일요일
 
-    weeks.push({
-      startDate: weekStart,
-      endDate: weekEnd,
-    });
+  while (currentWeekStart <= endDate) {
+    // 주차가 시작일과 종료일 범위에 포함되는 경우만 추가
+    if (currentWeekEnd >= startDate) {
+      weeks.push({
+        startDate: new Date(currentWeekStart),
+        endDate: new Date(currentWeekEnd),
+      });
+    }
 
-    currentDate.setDate(currentDate.getDate() + 7);
+    // 다음 주로 이동 (7일 후)
+    currentWeekStart = addDays(currentWeekStart, 7);
+    currentWeekEnd = addDays(currentWeekEnd, 7);
   }
 
   return weeks;
@@ -65,7 +73,11 @@ export function getWeeklyBudgets(
 
 export function getCurrentWeek(startDate: Date): number {
   const now = new Date();
-  const diffTime = now.getTime() - startDate.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return Math.ceil(diffDays / 7);
+  const startOfCurrentWeek = startOfWeek(now, { weekStartsOn: 1 });
+  const startOfBudgetWeek = startOfWeek(startDate, { weekStartsOn: 1 });
+
+  const diffTime = startOfCurrentWeek.getTime() - startOfBudgetWeek.getTime();
+  const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7));
+
+  return diffWeeks + 1;
 }

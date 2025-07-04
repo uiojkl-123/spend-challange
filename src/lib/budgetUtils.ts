@@ -1,9 +1,10 @@
 import { Budget, Expense, WeeklyBudget, BudgetStats } from '@/types';
 import { getExpenses } from './storage';
+import { startOfWeek, endOfWeek, addDays, addMonths } from 'date-fns';
 
 export const calculateWeeklyBudgets = (budget: Budget): WeeklyBudget[] => {
   const startDate = new Date(budget.startDate);
-  const endDate = getMonthEndDate(startDate);
+  const endDate = getNextMonthStartDate(startDate);
   const weeks = getWeeklyBudgets(startDate, endDate);
   const expenses = getExpenses();
 
@@ -22,15 +23,8 @@ export const calculateWeeklyBudgets = (budget: Budget): WeeklyBudget[] => {
       0
     );
 
-    // 주간 예산 계산 (마지막 주는 남은 금액)
-    let weeklyBudget: number;
-    if (index === weeks.length - 1) {
-      const previousWeeksBudget =
-        (weeks.length - 1) * (budget.amount / weeks.length);
-      weeklyBudget = budget.amount - previousWeeksBudget;
-    } else {
-      weeklyBudget = Math.floor(budget.amount / weeks.length);
-    }
+    // 주간 예산 계산 (주차 수만큼 균등하게 분배)
+    const weeklyBudget = Math.floor(budget.amount / weeks.length);
 
     return {
       weekNumber: index + 1,
@@ -49,25 +43,19 @@ export function getBudgetStats(budget: Budget): BudgetStats {
   // 주간 예산 계산
   const weeklyBudgets: WeeklyBudget[] = [];
   const startDate = new Date(budget.startDate);
-  const endDate = new Date(startDate);
-  endDate.setMonth(endDate.getMonth() + 1);
-  endDate.setDate(endDate.getDate() - 1);
+  const endDate = getNextMonthStartDate(startDate);
+  const weeks = getWeeklyBudgets(startDate, endDate);
 
-  const currentDate = new Date(startDate);
   let weekNumber = 1;
 
-  while (currentDate <= endDate) {
-    const weekStart = new Date(currentDate);
-    const weekEnd = new Date(currentDate);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-
-    // 주간 예산 계산 (월 예산을 주 수로 나누기)
-    const weekBudget = Math.round(budget.amount / 4);
+  for (const week of weeks) {
+    // 주간 예산 계산 (전체 예산을 주 수로 나누기)
+    const weekBudget = Math.floor(budget.amount / weeks.length);
 
     // 해당 주의 지출 계산
     const weekExpenses = expenses.filter((expense) => {
       const expenseDate = new Date(expense.date);
-      return expenseDate >= weekStart && expenseDate <= weekEnd;
+      return expenseDate >= week.startDate && expenseDate <= week.endDate;
     });
 
     const weekSpent = weekExpenses.reduce(
@@ -78,14 +66,13 @@ export function getBudgetStats(budget: Budget): BudgetStats {
 
     weeklyBudgets.push({
       weekNumber,
-      startDate: weekStart.toISOString(),
-      endDate: weekEnd.toISOString(),
+      startDate: week.startDate.toISOString(),
+      endDate: week.endDate.toISOString(),
       budget: weekBudget,
       spent: weekSpent,
       remaining: weekRemaining,
     });
 
-    currentDate.setDate(currentDate.getDate() + 7);
     weekNumber++;
   }
 
@@ -147,10 +134,14 @@ export const getMonthlyExpenses = (
 };
 
 // Helper functions
-function getMonthEndDate(startDate: Date): Date {
-  const endDate = new Date(startDate);
-  endDate.setMonth(endDate.getMonth() + 1);
+function getNextMonthStartDate(startDate: Date): Date {
+  // 다음 달의 같은 날짜를 계산
+  const nextMonthDate = addMonths(startDate, 1);
+
+  // 다음 달 startDate의 전날을 반환
+  const endDate = new Date(nextMonthDate);
   endDate.setDate(endDate.getDate() - 1);
+
   return endDate;
 }
 
@@ -159,19 +150,23 @@ function getWeeklyBudgets(
   endDate: Date
 ): Array<{ startDate: Date; endDate: Date }> {
   const weeks = [];
-  const currentDate = new Date(startDate);
 
-  while (currentDate <= endDate) {
-    const weekStart = new Date(currentDate);
-    const weekEnd = new Date(currentDate);
-    weekEnd.setDate(weekEnd.getDate() + 6);
+  // 시작일이 속한 주의 월요일부터 시작
+  let currentWeekStart = startOfWeek(startDate, { weekStartsOn: 1 }); // 1 = 월요일
+  let currentWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 }); // 일요일
 
-    weeks.push({
-      startDate: weekStart,
-      endDate: weekEnd,
-    });
+  while (currentWeekStart <= endDate) {
+    // 주차가 시작일과 종료일 범위에 포함되는 경우만 추가
+    if (currentWeekEnd >= startDate) {
+      weeks.push({
+        startDate: new Date(currentWeekStart),
+        endDate: new Date(currentWeekEnd),
+      });
+    }
 
-    currentDate.setDate(currentDate.getDate() + 7);
+    // 다음 주로 이동 (7일 후)
+    currentWeekStart = addDays(currentWeekStart, 7);
+    currentWeekEnd = addDays(currentWeekEnd, 7);
   }
 
   return weeks;
