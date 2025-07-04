@@ -1,16 +1,10 @@
 import { Budget, Expense, WeeklyBudget, BudgetStats } from '@/types';
-import {
-  getMonthStartDate,
-  getMonthEndDate,
-  getWeeklyBudgets,
-  getCurrentWeek,
-} from './dateUtils';
 import { getExpenses } from './storage';
 
 export const calculateWeeklyBudgets = (budget: Budget): WeeklyBudget[] => {
   const startDate = new Date(budget.startDate);
   const endDate = getMonthEndDate(startDate);
-  const weeks = getWeeklyBudgets(startDate, endDate, budget.amount);
+  const weeks = getWeeklyBudgets(startDate, endDate);
   const expenses = getExpenses();
 
   return weeks.map((week, index) => {
@@ -49,26 +43,72 @@ export const calculateWeeklyBudgets = (budget: Budget): WeeklyBudget[] => {
   });
 };
 
-export const getBudgetStats = (budget: Budget): BudgetStats => {
-  const weeklyBudgets = calculateWeeklyBudgets(budget);
-  const currentWeek = getCurrentWeek(new Date(budget.startDate));
-  const currentWeekData =
-    weeklyBudgets.find((w) => w.weekNumber === currentWeek) || weeklyBudgets[0];
+export function getBudgetStats(budget: Budget): BudgetStats {
+  const expenses = getExpenses();
 
-  const totalBudget = budget.amount;
-  const totalSpent = weeklyBudgets.reduce((sum, week) => sum + week.spent, 0);
-  const totalRemaining = totalBudget - totalSpent;
+  // 주간 예산 계산
+  const weeklyBudgets: WeeklyBudget[] = [];
+  const startDate = new Date(budget.startDate);
+  const endDate = new Date(startDate);
+  endDate.setMonth(endDate.getMonth() + 1);
+  endDate.setDate(endDate.getDate() - 1);
+
+  const currentDate = new Date(startDate);
+  let weekNumber = 1;
+
+  while (currentDate <= endDate) {
+    const weekStart = new Date(currentDate);
+    const weekEnd = new Date(currentDate);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+
+    // 주간 예산 계산 (월 예산을 주 수로 나누기)
+    const weekBudget = Math.round(budget.amount / 4);
+
+    // 해당 주의 지출 계산
+    const weekExpenses = expenses.filter((expense) => {
+      const expenseDate = new Date(expense.date);
+      return expenseDate >= weekStart && expenseDate <= weekEnd;
+    });
+
+    const weekSpent = weekExpenses.reduce(
+      (sum, expense) => sum + expense.amount,
+      0
+    );
+    const weekRemaining = weekBudget - weekSpent;
+
+    weeklyBudgets.push({
+      weekNumber,
+      startDate: weekStart.toISOString(),
+      endDate: weekEnd.toISOString(),
+      budget: weekBudget,
+      spent: weekSpent,
+      remaining: weekRemaining,
+    });
+
+    currentDate.setDate(currentDate.getDate() + 7);
+    weekNumber++;
+  }
+
+  // 총 지출 계산
+  const totalSpent = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const totalRemaining = budget.amount - totalSpent;
+
+  // 현재 주 예산 찾기
+  const now = new Date();
+  const currentWeek = weeklyBudgets.find(
+    (week) => now >= new Date(week.startDate) && now <= new Date(week.endDate)
+  );
 
   return {
-    totalBudget,
+    totalBudget: budget.amount,
     totalSpent,
     totalRemaining,
-    currentWeekBudget: currentWeekData.budget,
-    currentWeekSpent: currentWeekData.spent,
-    currentWeekRemaining: currentWeekData.remaining,
+    currentWeekBudget: currentWeek?.budget || 0,
+    currentWeekSpent: currentWeek?.spent || 0,
+    currentWeekRemaining: currentWeek?.remaining || 0,
     weeklyBudgets,
   };
-};
+}
 
 export const getExpensesByCategory = (expenses: Expense[]) => {
   const categoryMap = new Map<string, number>();
@@ -105,3 +145,34 @@ export const getMonthlyExpenses = (
 
   return getExpensesByDate(expenses, startDate, endDate);
 };
+
+// Helper functions
+function getMonthEndDate(startDate: Date): Date {
+  const endDate = new Date(startDate);
+  endDate.setMonth(endDate.getMonth() + 1);
+  endDate.setDate(endDate.getDate() - 1);
+  return endDate;
+}
+
+function getWeeklyBudgets(
+  startDate: Date,
+  endDate: Date
+): Array<{ startDate: Date; endDate: Date }> {
+  const weeks = [];
+  const currentDate = new Date(startDate);
+
+  while (currentDate <= endDate) {
+    const weekStart = new Date(currentDate);
+    const weekEnd = new Date(currentDate);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+
+    weeks.push({
+      startDate: weekStart,
+      endDate: weekEnd,
+    });
+
+    currentDate.setDate(currentDate.getDate() + 7);
+  }
+
+  return weeks;
+}

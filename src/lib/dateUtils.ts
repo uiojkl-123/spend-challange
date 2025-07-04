@@ -1,90 +1,71 @@
-import Holidays from 'date-holidays';
-import {
-  format,
-  addDays,
-  subDays,
-  startOfMonth,
-  endOfMonth,
-  eachWeekOfInterval,
-  startOfWeek,
-  endOfWeek,
-  isWeekend,
-  isSameDay,
-} from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import Holidays from 'date-holidays';
 
 const hd = new Holidays('KR');
 
-export const getNextWorkday = (date: Date): Date => {
-  let currentDate = new Date(date);
+export function formatDate(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return format(d, 'yyyy-MM-dd', { locale: ko });
+}
 
-  while (isWeekend(currentDate) || hd.isHoliday(currentDate)) {
-    currentDate = subDays(currentDate, 1);
-  }
+export function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('ko-KR').format(amount);
+}
 
-  return currentDate;
-};
-
-export const getMonthStartDate = (
+export function getMonthStartDate(
   year: number,
   month: number,
   startDay: number
-): Date => {
-  const firstDayOfMonth = new Date(year, month - 1, startDay);
+): Date {
+  // 해당 월의 시작일을 계산
+  let startDate = new Date(year, month - 1, startDay);
 
-  // 시작일이 주말이나 공휴일인 경우 이전 평일로 조정
-  if (isWeekend(firstDayOfMonth) || hd.isHoliday(firstDayOfMonth)) {
-    return getNextWorkday(firstDayOfMonth);
+  // 주말이나 공휴일인 경우 이전 평일로 조정
+  while (
+    startDate.getDay() === 0 ||
+    startDate.getDay() === 6 ||
+    hd.isHoliday(startDate)
+  ) {
+    startDate = addDays(startDate, -1);
   }
 
-  return firstDayOfMonth;
-};
+  return startDate;
+}
 
-export const getMonthEndDate = (startDate: Date): Date => {
-  const nextMonth = new Date(startDate);
-  nextMonth.setMonth(nextMonth.getMonth() + 1);
-  return subDays(nextMonth, 1);
-};
+export function getMonthEndDate(startDate: Date): Date {
+  const endDate = new Date(startDate);
+  endDate.setMonth(endDate.getMonth() + 1);
+  endDate.setDate(endDate.getDate() - 1);
+  return endDate;
+}
 
-export const getWeeklyBudgets = (
+export function getWeeklyBudgets(
   startDate: Date,
-  endDate: Date,
-  totalBudget: number
-): Array<{ startDate: Date; endDate: Date }> => {
-  const weeks = eachWeekOfInterval(
-    { start: startDate, end: endDate },
-    { weekStartsOn: 1 }
-  );
+  endDate: Date
+): Array<{ startDate: Date; endDate: Date }> {
+  const weeks = [];
+  const currentDate = new Date(startDate);
 
-  return weeks.map((weekStart) => ({
-    startDate: startOfWeek(weekStart, { weekStartsOn: 1 }),
-    endDate: endOfWeek(weekStart, { weekStartsOn: 1 }),
-  }));
-};
+  while (currentDate <= endDate) {
+    const weekStart = new Date(currentDate);
+    const weekEnd = new Date(currentDate);
+    weekEnd.setDate(weekEnd.getDate() + 6);
 
-export const formatDate = (date: Date | string): string => {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return format(dateObj, 'yyyy년 MM월 dd일', { locale: ko });
-};
+    weeks.push({
+      startDate: weekStart,
+      endDate: weekEnd,
+    });
 
-export const formatDateShort = (date: Date | string): string => {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return format(dateObj, 'MM/dd', { locale: ko });
-};
-
-export const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('ko-KR').format(amount);
-};
-
-export const getCurrentWeek = (startDate: Date): number => {
-  const now = new Date();
-  const weeks = getWeeklyBudgets(startDate, getMonthEndDate(startDate), 0);
-
-  for (let i = 0; i < weeks.length; i++) {
-    if (now >= weeks[i].startDate && now <= weeks[i].endDate) {
-      return i + 1;
-    }
+    currentDate.setDate(currentDate.getDate() + 7);
   }
 
-  return 1;
-};
+  return weeks;
+}
+
+export function getCurrentWeek(startDate: Date): number {
+  const now = new Date();
+  const diffTime = now.getTime() - startDate.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return Math.ceil(diffDays / 7);
+}

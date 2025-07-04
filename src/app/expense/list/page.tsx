@@ -182,7 +182,7 @@ export default function ExpenseListPage() {
                       <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 text-xs sm:text-sm text-gray-500 mt-1">
                         <span className="flex items-center">
                           <Calendar className="w-3 h-3 mr-1" />
-                          {formatDate(expense.date)}
+                          {formatDate(new Date(expense.date))}
                         </span>
                         <span className="flex items-center">
                           <DollarSign className="w-3 h-3 mr-1" />

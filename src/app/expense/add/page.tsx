@@ -13,7 +13,7 @@ import {
 import { formatCurrency } from '@/lib/dateUtils';
 import { Budget, Category, Expense } from '@/types';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Save, Plus } from 'lucide-react';
+import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AddExpensePage() {
@@ -85,7 +85,7 @@ export default function AddExpensePage() {
 
       alert('지출이 저장되었습니다.');
       router.push('/expense/list');
-    } catch (error) {
+    } catch {
       alert('지출 저장 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);

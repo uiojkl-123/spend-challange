@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { getBudget, getExpenses } from '@/lib/storage';
+import { getBudget } from '@/lib/storage';
 import { getBudgetStats } from '@/lib/budgetUtils';
 import { formatCurrency, formatDate } from '@/lib/dateUtils';
 import { Budget, BudgetStats } from '@/types';
@@ -84,13 +84,14 @@ export default function Dashboard() {
             대시보드
           </h1>
           <p className="text-sm sm:text-base text-gray-600 mt-1">
-            {formatDate(budget.startDate)} ~{' '}
+            {formatDate(new Date(budget.startDate))} ~{' '}
             {formatDate(
-              new Date(
-                new Date(budget.startDate).setMonth(
-                  new Date(budget.startDate).getMonth() + 1
-                ) - 1
-              )
+              (() => {
+                const end = new Date(budget.startDate);
+                end.setMonth(end.getMonth() + 1);
+                end.setDate(end.getDate() - 1);
+                return end;
+              })()
             )}
           </p>
         </div>

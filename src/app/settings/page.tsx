@@ -82,7 +82,7 @@ export default function SettingsPage() {
 
       alert('예산이 저장되었습니다.');
       router.push('/');
-    } catch (error) {
+    } catch {
       alert('예산 저장 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
